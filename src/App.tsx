@@ -1,13 +1,11 @@
-import { Routes, Route } from "react-router";
+import { AppRouter } from "./app/AppRouter";
+import { AppProviders } from "./app/providers";
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<div>Landing Page</div>} />
-      <Route path="/login" element={<div>Login</div>} />
-      <Route path="/signup" element={<div>Signup</div>} />
-      <Route path="/dashboard" element={<div>Dashboard</div>} />
-    </Routes>
+    <AppProviders>
+      <AppRouter />
+    </AppProviders>
   );
 }
 
