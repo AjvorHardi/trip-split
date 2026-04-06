@@ -1,6 +1,8 @@
 import { supabase } from "../../lib/supabase";
 import type {
   GroupDetail,
+  GroupExpense,
+  GroupExpenseInput,
   GroupInvite,
   GroupMember,
   GroupSummary,
@@ -48,6 +50,21 @@ type GroupInviteRow = {
   status: "accepted" | "pending";
 };
 
+type ExpenseRow = {
+  amount_cents: number;
+  created_at: string;
+  created_by: string;
+  description: string;
+  id: string;
+  payer_user_id: string;
+};
+
+type ExpenseParticipantRow = {
+  expense_id: string;
+  owed_cents: number;
+  user_id: string;
+};
+
 type GroupRow = {
   archived_at: string | null;
   created_at: string;
@@ -83,6 +100,27 @@ function mapGroup(row: GroupRow): GroupSummary {
     createdBy: row.created_by,
     id: row.id,
     name: row.name,
+  };
+}
+
+function mapExpenseRow(
+  row: ExpenseRow,
+  participants: ExpenseParticipantRow[],
+): GroupExpense {
+  return {
+    amountCents: row.amount_cents,
+    createdAt: row.created_at,
+    createdBy: row.created_by,
+    description: row.description,
+    id: row.id,
+    participants: participants
+      .filter((participant) => participant.expense_id === row.id)
+      .map((participant) => ({
+        expenseId: participant.expense_id,
+        owedCents: participant.owed_cents,
+        userId: participant.user_id,
+      })),
+    payerUserId: row.payer_user_id,
   };
 }
 
@@ -215,6 +253,95 @@ export async function inviteToGroup(groupId: string, email: string) {
 
   if (typeof data !== "string") {
     throw new Error("Supabase did not return the new invite id.");
+  }
+
+  return data;
+}
+
+export async function listGroupExpenses(groupId: string) {
+  const { data: expenseRows, error: expenseError } = await supabase
+    .from("expenses")
+    .select("id, description, amount_cents, payer_user_id, created_by, created_at")
+    .eq("group_id", groupId)
+    .order("created_at", { ascending: false });
+
+  if (expenseError) {
+    throwSupabaseError(expenseError);
+  }
+
+  const typedExpenseRows = (expenseRows ?? []) as ExpenseRow[];
+
+  if (typedExpenseRows.length === 0) {
+    return [];
+  }
+
+  const expenseIds = typedExpenseRows.map((expense) => expense.id);
+
+  const { data: participantRows, error: participantError } = await supabase
+    .from("expense_participants")
+    .select("expense_id, user_id, owed_cents")
+    .in("expense_id", expenseIds);
+
+  if (participantError) {
+    throwSupabaseError(participantError);
+  }
+
+  const typedParticipantRows = (participantRows ?? []) as ExpenseParticipantRow[];
+
+  return typedExpenseRows.map((row) => mapExpenseRow(row, typedParticipantRows));
+}
+
+export async function createGroupExpense(groupId: string, input: GroupExpenseInput) {
+  const { data, error } = await supabase.rpc("create_group_expense", {
+    expense_participant_user_ids: input.participantUserIds,
+    expense_payer_user_id: input.payerUserId,
+    expense_description: input.description,
+    target_group_id: groupId,
+    total_amount_cents: input.amountCents,
+  });
+
+  if (error) {
+    throwSupabaseError(error);
+  }
+
+  if (typeof data !== "string") {
+    throw new Error("Supabase did not return the new expense id.");
+  }
+
+  return data;
+}
+
+export async function updateGroupExpense(expenseId: string, input: GroupExpenseInput) {
+  const { data, error } = await supabase.rpc("update_group_expense", {
+    expense_participant_user_ids: input.participantUserIds,
+    expense_payer_user_id: input.payerUserId,
+    expense_description: input.description,
+    target_expense_id: expenseId,
+    total_amount_cents: input.amountCents,
+  });
+
+  if (error) {
+    throwSupabaseError(error);
+  }
+
+  if (typeof data !== "string") {
+    throw new Error("Supabase did not return the updated expense id.");
+  }
+
+  return data;
+}
+
+export async function deleteGroupExpense(expenseId: string) {
+  const { data, error } = await supabase.rpc("delete_group_expense", {
+    target_expense_id: expenseId,
+  });
+
+  if (error) {
+    throwSupabaseError(error);
+  }
+
+  if (typeof data !== "string") {
+    throw new Error("Supabase did not return the deleted expense id.");
   }
 
   return data;

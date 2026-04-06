@@ -27,3 +27,32 @@ export type GroupInvite = {
 };
 
 export type GroupDetail = GroupSummary;
+
+export type ExpenseParticipant = {
+  expenseId: string;
+  owedCents: number;
+  userId: string;
+};
+
+export type GroupExpense = {
+  amountCents: number;
+  createdAt: string;
+  createdBy: string;
+  description: string;
+  id: string;
+  participants: ExpenseParticipant[];
+  payerUserId: string;
+};
+
+export type GroupExpenseInput = {
+  amountCents: number;
+  description: string;
+  participantUserIds: string[];
+  payerUserId: string;
+};
+
+export type MemberBalance = {
+  email: string;
+  netCents: number;
+  userId: string;
+};
