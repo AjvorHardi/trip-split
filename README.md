@@ -1,73 +1,70 @@
-# React + TypeScript + Vite
+# Trip-Split
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Trip-Split is a practical MVP for shared trip and event expenses. The current build covers:
 
-Currently, two official plugins are available:
+- public landing page
+- email/password auth with Supabase
+- protected app routes
+- creating groups
+- inviting members by email
+- accepting pending invitations from the dashboard
+- viewing group members and open invites
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Expenses and balances are not implemented yet.
 
-## React Compiler
+## Local setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. Install dependencies:
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+2. Create `.env` with:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+VITE_SUPABASE_URL=your-project-url
+VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
+
+3. Start the app:
+
+```bash
+npm run dev
+```
+
+## Supabase setup
+
+The app expects email/password auth and the phase-3 database schema.
+
+1. In Supabase Auth, enable email/password sign-in.
+2. For the current signup flow, disable email confirmation. The app currently expects Supabase to return a session immediately after signup.
+3. Open the SQL Editor in your Supabase project.
+4. Run the SQL from `supabase/migrations/001_phase3_groups_invites.sql`.
+
+That SQL creates:
+
+- `profiles`
+- `groups`
+- `group_members`
+- `group_invites`
+- row-level security policies
+- helper RPC functions used by the app
+
+## Manual verification
+
+After running the SQL:
+
+1. Sign up with a fresh account.
+2. Create a group from `/app/groups`.
+3. Open the group page and invite another email.
+4. Sign in with that invited email.
+5. Accept the invite from the dashboard.
+6. Confirm the accepted account can open the group page and see the member list.
+
+## Current assumptions
+
+- Group invitations are visible in-app only.
+- Any existing group member can invite another email.
+- Group names are capped at 80 characters.
+- Emails are normalized to lowercase in the database functions.
