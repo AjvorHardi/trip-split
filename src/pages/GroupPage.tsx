@@ -1,8 +1,9 @@
 import { type FormEvent, useEffect, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useNavigate, useParams } from "react-router";
 import { LoadingBlock } from "../components/feedback/LoadingBlock";
 import { useAuth } from "../features/auth/useAuth";
 import {
+  archiveGroup,
   createGroupExpense,
   deleteGroupExpense,
   getGroup,
@@ -10,6 +11,7 @@ import {
   listGroupExpenses,
   listGroupInvites,
   listGroupMembers,
+  renameGroup,
   updateGroupExpense,
 } from "../features/groups/groups.api";
 import type {
@@ -93,11 +95,13 @@ function buildBalances(members: GroupMember[], expenses: GroupExpense[]): Member
 
 export function GroupPage() {
   const { groupId } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [group, setGroup] = useState<GroupDetail | null>(null);
   const [members, setMembers] = useState<GroupMember[]>([]);
   const [expenses, setExpenses] = useState<GroupExpense[]>([]);
   const [invites, setInvites] = useState<GroupInvite[]>([]);
+  const [groupNameInput, setGroupNameInput] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
   const [expenseDescription, setExpenseDescription] = useState("");
   const [amountInput, setAmountInput] = useState("");
@@ -109,6 +113,8 @@ export function GroupPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isInviting, setIsInviting] = useState(false);
   const [isSavingExpense, setIsSavingExpense] = useState(false);
+  const [isRenamingGroup, setIsRenamingGroup] = useState(false);
+  const [isArchivingGroup, setIsArchivingGroup] = useState(false);
   const [activeDeleteExpenseId, setActiveDeleteExpenseId] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -166,6 +172,7 @@ export function GroupPage() {
         }
 
         setGroup(nextGroup);
+        setGroupNameInput(nextGroup.name);
         setMembers(nextMembers);
         setInvites(nextInvites);
         setExpenses(nextExpenses);
@@ -192,6 +199,8 @@ export function GroupPage() {
   }, [groupId, reloadKey]);
 
   const balances = buildBalances(members, expenses);
+  const isGroupCreator = group?.createdBy === user?.id;
+  const isArchived = group?.archivedAt !== null;
   const memberEmailById = new Map(members.map((member) => [member.userId, member.email]));
   const selectedParticipantCount = selectedParticipantIds.length;
 
@@ -214,7 +223,7 @@ export function GroupPage() {
   const handleInviteSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!groupId) {
+    if (!groupId || isArchived) {
       return;
     }
 
@@ -247,7 +256,7 @@ export function GroupPage() {
   const handleExpenseSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (!groupId) {
+    if (!groupId || isArchived) {
       return;
     }
 
@@ -313,6 +322,10 @@ export function GroupPage() {
   };
 
   const handleDeleteExpense = async (expenseId: string) => {
+    if (isArchived) {
+      return;
+    }
+
     setErrorMessage(null);
     setSuccessMessage(null);
     setActiveDeleteExpenseId(expenseId);
@@ -332,6 +345,50 @@ export function GroupPage() {
       );
     } finally {
       setActiveDeleteExpenseId(null);
+    }
+  };
+
+  const handleRenameGroup = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    if (!groupId || !isGroupCreator) {
+      return;
+    }
+
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setIsRenamingGroup(true);
+
+    try {
+      await renameGroup(groupId, groupNameInput);
+      setSuccessMessage("Group renamed.");
+      setReloadKey((value) => value + 1);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Unable to rename the group.",
+      );
+    } finally {
+      setIsRenamingGroup(false);
+    }
+  };
+
+  const handleArchiveGroup = async () => {
+    if (!groupId || !isGroupCreator) {
+      return;
+    }
+
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setIsArchivingGroup(true);
+
+    try {
+      await archiveGroup(groupId);
+      navigate("/app/groups", { replace: true });
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Unable to archive the group.",
+      );
+      setIsArchivingGroup(false);
     }
   };
 
@@ -376,6 +433,62 @@ export function GroupPage() {
           role="status"
         >
           {successMessage}
+        </div>
+      ) : null}
+
+      {isArchived ? (
+        <div className="border-2 border-black/20 bg-black/6 px-4 py-3 text-sm text-[var(--ts-ink)]">
+          This group is archived. New expenses and invitations are disabled.
+        </div>
+      ) : null}
+
+      {isGroupCreator ? (
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_18rem]">
+          <div className="ts-panel-light p-8">
+            <p className="ts-kicker text-[var(--ts-muted)]">Group settings</p>
+            <h2 className="ts-display mt-3 text-[2.3rem] text-[var(--ts-ink)]">
+              Creator controls
+            </h2>
+            <form className="mt-6 space-y-4" onSubmit={handleRenameGroup}>
+              <label className="block">
+                <span className="ts-label">Group name</span>
+                <input
+                  type="text"
+                  required
+                  maxLength={80}
+                  value={groupNameInput}
+                  onChange={(event) => setGroupNameInput(event.target.value)}
+                  className="ts-input"
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={isRenamingGroup}
+                className="ts-button-primary px-5 py-3 text-xs"
+              >
+                {isRenamingGroup ? "Saving..." : "Rename group"}
+              </button>
+            </form>
+          </div>
+
+          <div className="ts-panel-light p-8">
+            <p className="ts-kicker text-[var(--ts-muted)]">Archive</p>
+            <h2 className="ts-display mt-3 text-[2rem] text-[var(--ts-ink)]">
+              Close this ledger
+            </h2>
+            <p className="mt-4 text-sm leading-7 text-[var(--ts-muted)]">
+              Archived groups stay readable by members but disappear from the main
+              groups list.
+            </p>
+            <button
+              type="button"
+              onClick={() => void handleArchiveGroup()}
+              disabled={isArchivingGroup || isArchived}
+              className="mt-6 border-2 border-[var(--ts-danger)] px-4 py-3 text-xs font-bold uppercase tracking-[0.08em] text-[var(--ts-danger)] transition hover:bg-[var(--ts-danger)] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isArchived ? "Archived" : isArchivingGroup ? "Archiving..." : "Archive group"}
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -512,7 +625,7 @@ export function GroupPage() {
             <div className="flex gap-3">
               <button
                 type="submit"
-                disabled={isSavingExpense}
+                disabled={isSavingExpense || isArchived}
                 className="ts-button-primary flex-1 px-5 py-3 text-xs"
               >
                 {isSavingExpense
@@ -607,6 +720,7 @@ export function GroupPage() {
                         <button
                           type="button"
                           onClick={() => handleEditExpense(expense)}
+                          disabled={isArchived}
                           className="ts-button-secondary px-4 py-2 text-xs"
                         >
                           Edit
@@ -614,7 +728,7 @@ export function GroupPage() {
                         <button
                           type="button"
                           onClick={() => void handleDeleteExpense(expense.id)}
-                          disabled={isDeleting}
+                          disabled={isDeleting || isArchived}
                           className="border-2 border-[var(--ts-danger)] px-4 py-2 text-xs font-bold uppercase tracking-[0.08em] text-[var(--ts-danger)] transition hover:bg-[var(--ts-danger)] hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {isDeleting ? "Deleting..." : "Delete"}
@@ -681,7 +795,7 @@ export function GroupPage() {
               Invitations stay pending until the invited account accepts from the
               dashboard.
             </p>
-            <form className="mt-6 space-y-4" onSubmit={handleInviteSubmit}>
+          <form className="mt-6 space-y-4" onSubmit={handleInviteSubmit}>
               <label className="block">
                 <span className="ts-label text-white">Email</span>
                 <input
@@ -695,7 +809,7 @@ export function GroupPage() {
               </label>
               <button
                 type="submit"
-                disabled={isInviting}
+                disabled={isInviting || isArchived}
                 className="ts-button-primary w-full px-5 py-3 text-xs"
               >
                 {isInviting ? "Sending..." : "Send invite"}

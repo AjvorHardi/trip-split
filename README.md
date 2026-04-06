@@ -11,6 +11,7 @@ Trip-Split is a practical MVP for shared trip and event expenses. The current bu
 - viewing group members and open invites
 - adding, editing, and deleting your own shared expenses
 - equal split balances inside each group
+- creator-only group rename and archive
 
 ## Local setup
 
@@ -35,13 +36,14 @@ npm run dev
 
 ## Supabase setup
 
-The app expects email/password auth plus the phase-3 and phase-4 database schema.
+The app expects email/password auth plus the phase-3, phase-4, and phase-5 database schema.
 
 1. In Supabase Auth, enable email/password sign-in.
 2. For the current signup flow, disable email confirmation. The app currently expects Supabase to return a session immediately after signup.
 3. Open the SQL Editor in your Supabase project.
 4. Run the SQL from `supabase/migrations/001_phase3_groups_invites.sql`.
 5. Run the SQL from `supabase/migrations/002_phase4_expenses.sql`.
+6. Run the SQL from `supabase/migrations/003_phase5_group_management.sql`.
 
 That SQL creates:
 
@@ -68,6 +70,8 @@ After running the SQL:
 8. Confirm balances update on the group page.
 9. Edit the expense as its creator.
 10. Delete the expense as its creator.
+11. Rename the group as its creator.
+12. Archive the group as its creator and confirm it disappears from `/app/groups`.
 
 ## Current assumptions
 

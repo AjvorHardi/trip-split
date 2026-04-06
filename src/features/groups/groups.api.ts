@@ -346,3 +346,36 @@ export async function deleteGroupExpense(expenseId: string) {
 
   return data;
 }
+
+export async function renameGroup(groupId: string, name: string) {
+  const { data, error } = await supabase.rpc("rename_group", {
+    group_name: name,
+    target_group_id: groupId,
+  });
+
+  if (error) {
+    throwSupabaseError(error);
+  }
+
+  if (typeof data !== "string") {
+    throw new Error("Supabase did not return the renamed group id.");
+  }
+
+  return data;
+}
+
+export async function archiveGroup(groupId: string) {
+  const { data, error } = await supabase.rpc("archive_group", {
+    target_group_id: groupId,
+  });
+
+  if (error) {
+    throwSupabaseError(error);
+  }
+
+  if (typeof data !== "string") {
+    throw new Error("Supabase did not return the archived group id.");
+  }
+
+  return data;
+}
